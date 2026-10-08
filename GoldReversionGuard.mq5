@@ -10,7 +10,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Ronnis Nai"
 #property link      ""
-#property version   "1.00"
+#property version   "1.01"
 #property description "Gold mean reversion with cost, trend, volatility, session and news filters."
 #property description "Risk-based position sizing, daily loss limit and loss cooldown. No martingale, no grid."
 
@@ -297,7 +297,8 @@ void TryEntry()
 
    // Position size from risk
    string sizeNote = "";
-   double lots = LotsForRisk(slDist, sizeNote);
+   double riskMoney = 0;
+   double lots = LotsForRisk(wantBuy, entry, sl, sizeNote, riskMoney);
    if(lots <= 0)
    {
       gStatus = sizeNote;
@@ -319,8 +320,9 @@ void TryEntry()
    if(ok && (trade.ResultRetcode() == TRADE_RETCODE_DONE || trade.ResultRetcode() == TRADE_RETCODE_PLACED))
    {
       gStatus = (wantBuy ? "Bought " : "Sold ") + DoubleToString(lots, 2) + " lots" + sizeNote;
-      PrintFormat("GoldReversionGuard: %s %.2f lots at %.2f, SL %.2f, TP %.2f, Z %.2f, ADX %.1f",
-                  wantBuy ? "BUY" : "SELL", lots, entry, sl, tp, gZ, gADX);
+      PrintFormat("GoldReversionGuard: %s %.2f lots at %.2f, SL %.2f, TP %.2f, Z %.2f, ADX %.1f, risk %.2f %s (%.2f%%)",
+                  wantBuy ? "BUY" : "SELL", lots, entry, sl, tp, gZ, gADX,
+                  riskMoney, AccountInfoString(ACCOUNT_CURRENCY), riskMoney / AccountInfoDouble(ACCOUNT_EQUITY) * 100.0);
    }
    else
    {
@@ -433,34 +435,43 @@ void ManagePosition()
 
 //+------------------------------------------------------------------+
 //| Lot size so that hitting the stop loses about InpRiskPercent     |
+//| Uses OrderCalcProfit, which asks the terminal for the real money |
+//| result of a move, so it works with any contract size or broker.  |
 //+------------------------------------------------------------------+
-double LotsForRisk(double slDist, string &note)
+double LotsForRisk(bool isBuy, double entry, double sl, string &note, double &riskOut)
 {
    note = "";
-   double equity    = AccountInfoDouble(ACCOUNT_EQUITY);
-   double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE_LOSS);
-   if(tickValue <= 0) tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
-   double tickSize  = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
-   double minLot    = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
-   double maxLot    = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
-   double step      = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
-   if(equity <= 0 || tickValue <= 0 || tickSize <= 0 || step <= 0)
+   riskOut = 0;
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
+   double step   = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   if(equity <= 0 || step <= 0 || minLot <= 0)
    {
       note = "Symbol data not ready";
       return 0;
    }
 
-   double lossPerLot = slDist / tickSize * tickValue;
-   double riskMoney  = equity * InpRiskPercent / 100.0;
-   double lots       = riskMoney / lossPerLot;
-   lots = MathFloor(lots / step) * step;
+   // Money lost by 1.0 lot if the stop loss is hit
+   double pl = 0;
+   ENUM_ORDER_TYPE type = isBuy ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   if(!OrderCalcProfit(type, _Symbol, 1.0, entry, sl, pl) || pl >= 0)
+   {
+      note = "Could not calculate trade risk";
+      Print("GoldReversionGuard: OrderCalcProfit failed, error ", GetLastError());
+      return 0;
+   }
+   double lossPerLot = -pl;
+
+   double riskMoney = equity * InpRiskPercent / 100.0;
+   double lots      = MathFloor(riskMoney / lossPerLot / step + 1e-9) * step;
 
    if(lots < minLot)
    {
       double minLotRiskPct = minLot * lossPerLot / equity * 100.0;
       if(!InpAllowMinLot || minLotRiskPct > InpMinLotRiskCap)
       {
-         note = "Account too small: 0.01 lot would risk " + DoubleToString(minLotRiskPct, 1) + "%";
+         note = "Account too small: minimum lot would risk " + DoubleToString(minLotRiskPct, 1) + "%";
          return 0;
       }
       lots = minLot;
@@ -469,7 +480,9 @@ double LotsForRisk(double slDist, string &note)
    lots = MathMin(lots, maxLot);
 
    int volDigits = (int)MathMax(0, MathRound(-MathLog10(step)));
-   return NormalizeDouble(lots, volDigits);
+   lots = NormalizeDouble(lots, volDigits);
+   riskOut = lots * lossPerLot;
+   return lots;
 }
 
 //+------------------------------------------------------------------+

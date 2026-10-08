@@ -37,7 +37,7 @@ A trade is only considered when **all** of these are true:
 - **Direction:** buy when price is stretched low, sell when stretched high.
 - **Take profit:** at the average. It is moved each bar as the average moves.
 - **Stop loss:** the larger of 2.5 × ATR or 500 points.
-- **Size:** calculated so that hitting the stop loses about **1% of equity**.
+- **Size:** calculated so that hitting the stop loses about **1% of equity**, using MetaTrader's own profit calculation so it is correct for any broker's contract size. Each trade's risk in money and % is written to the Experts log.
 
 ### 4. Manage and exit
 In order of priority:
@@ -59,13 +59,14 @@ Account-level protection:
 
 The EA will **refuse to trade** if the smallest possible trade (0.01 lot) would risk more than your chosen risk percentage. The status panel shows *"Account too small"* when that happens.
 
-With gold, a 0.01 lot usually moves about **$1 for every $1 change in the gold price**. With a typical stop of $5–8, one losing trade at 0.01 lot costs roughly $5–8.
+With gold, a 0.01 lot usually moves about **$1 for every $1 change in the gold price**. At recent gold prices the bot's stop is typically $15–25 away, so one losing trade at 0.01 lot costs roughly $15–25.
 
 | Equity | 0.01-lot loss as % of account |
 |---|---|
-| $50 | 10–16% |
-| $200 | 2.5–4% |
-| $800 | about 1% |
+| $100 | 15–25% |
+| $500 | 3–5% |
+| $1,000 | 1.5–2.5% |
+| $2,000 | about 1% |
 
 To trade a smaller account you can set `InpAllowMinLot = true`. The EA will then use 0.01 lot as long as it risks no more than `InpMinLotRiskCap` (default 3%). Going higher than that makes a few losses in a row very damaging.
 
