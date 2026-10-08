@@ -76,9 +76,9 @@ Check your broker's contract size for gold. Some "micro" accounts use smaller co
 ## Installation
 
 1. Open MetaTrader 5 and go to **File → Open Data Folder**.
-2. Copy `Experts/GoldReversionGuard.mq5` into `MQL5/Experts/`.
+2. Copy `GoldReversionGuard.mq5` into `MQL5/Experts/`.
 3. Open **MetaEditor** (F4), open the file and press **Compile** (F7). It should finish with 0 errors.
-4. In MetaTrader 5, open a **XAUUSD** chart. Any chart timeframe works; the EA uses its own timeframe setting.
+4. In MetaTrader 5, open a **XAUUSD** (called **GOLD** on XM) chart. Any chart timeframe works; the EA uses its own timeframe setting.
 5. Drag **GoldReversionGuard** from the Navigator onto the chart, review the inputs, and tick **Allow Algo Trading**.
 6. Turn on **Algo Trading** in the toolbar. The status panel appears in the top-left corner.
 
