@@ -1,0 +1,13 @@
+# Compiled MetaTrader files
+*.ex5
+*.ex4
+
+# Strategy Tester and terminal output
+*.log
+Tester/
+*.htm
+*.html
+
+# OS files
+.DS_Store
+Thumbs.db
